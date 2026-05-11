@@ -14,6 +14,8 @@ from playwright.sync_api import sync_playwright
 URL = "https://app.xcloudphone.com/"
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "browser_profile")
 SCREENSHOTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "screenshots")
+# Set HEADLESS=1 untuk menjalankan tanpa GUI (server/CI), default: non-headless
+HEADLESS = os.environ.get("HEADLESS", "0") == "1"
 
 
 def ensure_directories():
@@ -39,17 +41,19 @@ def run_automation():
     print("[*] Memulai XCloudPhone Bot...")
     print(f"[*] Profile browser: {PROFILE_DIR}")
     print(f"[*] Target URL: {URL}")
+    print(f"[*] Mode: {'headless' if HEADLESS else 'non-headless (visible)'}")
 
     with sync_playwright() as p:
         # Gunakan persistent context untuk mempertahankan session login
-        # Browser non-headless (visible) agar user bisa login manual jika diperlukan
+        # HEADLESS=1 untuk server/CI, default non-headless agar user bisa login manual
         context = p.chromium.launch_persistent_context(
             user_data_dir=PROFILE_DIR,
-            headless=False,
+            headless=HEADLESS,
             viewport={"width": 1280, "height": 720},
             args=[
                 "--disable-blink-features=AutomationControlled",
                 "--no-sandbox",
+                "--disable-gpu",
             ],
         )
 
@@ -61,7 +65,7 @@ def run_automation():
 
         # Navigasi ke XCloudPhone
         print("[*] Membuka XCloudPhone...")
-        page.goto(URL, wait_until="networkidle", timeout=60000)
+        page.goto(URL, wait_until="domcontentloaded", timeout=60000)
 
         # Cek apakah sudah login atau masih di halaman login
         current_url = page.url
@@ -75,7 +79,7 @@ def run_automation():
             print("[+] Login berhasil terdeteksi!")
 
         # Tunggu halaman dashboard termuat
-        page.wait_for_load_state("networkidle", timeout=30000)
+        page.wait_for_load_state("domcontentloaded", timeout=30000)
         print("[+] Dashboard berhasil dimuat.")
 
         # Ambil screenshot dashboard
